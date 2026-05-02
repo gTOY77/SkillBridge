@@ -8,7 +8,7 @@ const {
   addSkill,
   removeSkill,
 } = require('../controllers/userController');
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 
 router.get('/:id', getUserProfile);
 router.put('/:id', auth, updateUserProfile);

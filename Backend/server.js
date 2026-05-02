@@ -13,6 +13,7 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const projectRoutes = require('./routes/projectRoutes');
 const skillRoutes = require('./routes/skillRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 // 3. Set up the Express App
 const app = express();
@@ -39,6 +40,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/skills', skillRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 7. 404 Handler
 app.use((req, res) => {

@@ -9,7 +9,7 @@ const {
   searchProjects,
   placeBid,
 } = require('../controllers/projectController');
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 
 router.post('/', auth, createProject);
 router.get('/', getProjects);

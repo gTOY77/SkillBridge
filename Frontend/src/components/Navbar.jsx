@@ -123,14 +123,20 @@ const Navbar = () => {
         ) : (
           <>
             <li>
+              {/* 👇 Changed this to say Admin Panel if you are an admin */}
               <Link to="/dashboard" style={linkStyle} onMouseEnter={(e) => e.target.style.color = 'var(--primary-blue)'} onMouseLeave={(e) => e.target.style.color = 'var(--text-dark)'}>
-                📊 Dashboard
+                {user.role === 'admin' ? '👑 Admin Panel' : '📊 Dashboard'}
               </Link>
             </li>
             <li style={userMenuStyle}>
               <div style={userInfoStyle}>
                 <div style={userNameStyle}>{user.name}</div>
-                <div style={userRoleStyle}>{user.role === 'expert' ? '💼 Expert' : '📚 Client'}</div>
+                
+                {/* 👇 Added the Admin role check here! */}
+                <div style={userRoleStyle}>
+                  {user.role === 'admin' ? '👑 Admin' : user.role === 'expert' ? '💼 Expert' : '📚 Client'}
+                </div>
+
               </div>
               <button onClick={handleLogout} style={logoutButtonStyle} onMouseEnter={(e) => e.target.style.backgroundColor = '#c0392b'} onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--danger-red)'}>
                 Logout

@@ -23,8 +23,8 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['client', 'expert'],
-      required: [true, 'Please specify role: client or expert'],
+      enum: ['client', 'expert', 'admin'],
+      required: [true, 'Please specify a role'],
     },
     profileImage: {
       type: String,
@@ -61,6 +61,13 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+   
+    status: {
+      type: String,
+      enum: ['Active', 'Inactive', 'Banned'],
+      default: 'Active',
+    },
+
     createdAt: {
       type: Date,
       default: Date.now,

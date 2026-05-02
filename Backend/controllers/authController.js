@@ -78,6 +78,15 @@ exports.login = async (req, res) => {
       });
     }
 
+    // 🛑 NEW CODE: The Bouncer! Check if they are banned before checking password
+    if (user.status === 'Banned' || user.status === 'Inactive' || user.status === 'banned') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been banned. You cannot log in.',
+      });
+    }
+    // 🛑 END OF NEW CODE
+
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(400).json({

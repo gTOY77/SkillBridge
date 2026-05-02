@@ -11,23 +11,14 @@ const ExpertDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [newSkill, setNewSkill] = useState('');
+  
   const [availableSkills] = useState([
-    'Web Development',
-    'Mobile App Development',
-    'UI/UX Design',
-    'Python',
-    'JavaScript',
-    'React',
-    'Node.js',
-    'Database Design',
-    'Machine Learning',
-    'Data Analysis',
-    'Cloud Computing',
-    'DevOps',
-    'Cybersecurity',
-    'Game Development',
-    'IoT Development',
+    'Web Development', 'Mobile App Development', 'UI/UX Design', 'Python',
+    'JavaScript', 'React', 'Node.js', 'Database Design', 'Machine Learning',
+    'Data Analysis', 'Cloud Computing', 'DevOps', 'Cybersecurity',
+    'Game Development', 'IoT Development',
   ]);
+
   const [stats, setStats] = useState({
     totalSkills: 0,
     bidsMade: 0,
@@ -36,59 +27,59 @@ const ExpertDashboard = () => {
   });
 
   useEffect(() => {
-    if (user?._id || user?.id) {
-      fetchData();
-    }
-  }, [user?._id, user?.id]);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
+    const fetchData = async () => {
       const userId = user?._id || user?.id;
-      let currentProfile = user;
-      if (userId) {
+      if (!userId) return;
+
+      try {
+        setLoading(true);
+        setError('');
+        
+        let currentProfile = user;
         const profileResponse = await userAPI.getProfile(userId);
-        currentProfile = profileResponse.data.user;
-        setProfile(currentProfile);
-        setSkills(currentProfile.skills || []);
-      }
+        
+        if (profileResponse?.data?.user) {
+          currentProfile = profileResponse.data.user;
+          setProfile(currentProfile);
+        }
 
-      // Fetch all projects to find ones the expert has bid on
-      const projectResponse = await projectAPI.getProjects(1, 100);
-      const allProjects = projectResponse.data.projects;
+        // Fetch all projects to find ones the expert has bid on
+        const projectResponse = await projectAPI.getProjects(1, 100);
+        const allProjects = projectResponse.data.projects || [];
 
-      // Find bids made by this expert
-      const bidsToProjects = [];
-      allProjects.forEach(project => {
-        project.bids?.forEach(bid => {
-          if (String(bid.userId) === String(userId)) {
-            bidsToProjects.push(project);
-          }
+        // Find bids made by this expert
+        const bidsToProjects = [];
+        allProjects.forEach(project => {
+          project.bids?.forEach(bid => {
+            if (String(bid.userId) === String(userId)) {
+              bidsToProjects.push(project);
+            }
+          });
         });
-      });
 
-      setProjects(bidsToProjects);
+        setProjects(bidsToProjects);
+        setSkills(currentProfile?.skills || []);
 
-      // Calculate stats
-      setStats({
-        totalSkills: currentProfile?.skills?.length || 0,
-        bidsMade: bidsToProjects.length,
-        projectsWon: bidsToProjects.filter(p => p.assignedTo?._id === userId).length,
-        totalEarnings: bidsToProjects
-          .filter(p => p.assignedTo?._id === userId)
-          .reduce((sum, p) => sum + (p.budget || 0), 0),
-      });
+        // Calculate stats
+        setStats({
+          totalSkills: currentProfile?.skills?.length || 0,
+          bidsMade: bidsToProjects.length,
+          projectsWon: bidsToProjects.filter(p => p.assignedTo?._id === userId).length,
+          totalEarnings: bidsToProjects
+            .filter(p => p.assignedTo?._id === userId)
+            .reduce((sum, p) => sum + (p.budget || 0), 0),
+        });
 
-      setSkills(currentProfile?.skills || []);
-    } catch (err) {
-      setError('Failed to load data');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      } catch (err) {
+        setError('Failed to load data');
+        console.error('Dashboard Fetch Error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user?._id, user?.id]);
 
   const handleAddSkill = async () => {
     if (!newSkill.trim()) return;
@@ -115,251 +106,10 @@ const ExpertDashboard = () => {
     }
   };
 
-  const styles = {
-    container: {
-      minHeight: 'calc(100vh - 80px)',
-      backgroundColor: 'var(--bg-light)',
-      padding: '2rem',
-    },
-    content: {
-      maxWidth: '1200px',
-      margin: '0 auto',
-    },
-    header: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '2rem',
-      flexWrap: 'wrap',
-      gap: '1rem',
-    },
-    headerInfo: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '1rem',
-    },
-    avatar: {
-      width: '60px',
-      height: '60px',
-      borderRadius: '50%',
-      backgroundColor: 'var(--accent-purple)',
-      color: '#fff',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: '1.8rem',
-      fontWeight: '700',
-    },
-    headerText: {
-      display: 'flex',
-      flexDirection: 'column',
-    },
-    welcomeTitle: {
-      fontSize: '1.8rem',
-      fontWeight: '700',
-      color: 'var(--text-dark)',
-    },
-    userRole: {
-      fontSize: '0.9rem',
-      color: 'var(--text-gray)',
-    },
-    ratingDisplay: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.5rem',
-      marginTop: '0.3rem',
-      fontSize: '0.95rem',
-    },
-    buttonGroup: {
-      display: 'flex',
-      gap: '0.5rem',
-    },
-    button: {
-      padding: '0.7rem 1.2rem',
-      backgroundColor: 'var(--accent-purple)',
-      color: '#fff',
-      border: 'none',
-      borderRadius: '8px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      textDecoration: 'none',
-      display: 'inline-block',
-      transition: 'all 0.3s ease',
-    },
-    secondaryButton: {
-      backgroundColor: '#e5e7eb',
-      color: 'var(--text-dark)',
-    },
-    statsGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '1rem',
-      marginBottom: '2rem',
-    },
-    statCard: {
-      backgroundColor: '#fff',
-      padding: '1.5rem',
-      borderRadius: '12px',
-      boxShadow: 'var(--shadow)',
-      textAlign: 'center',
-      border: '1px solid var(--border-light)',
-    },
-    statValue: {
-      fontSize: '2.5rem',
-      fontWeight: '800',
-      color: 'var(--accent-purple)',
-      marginBottom: '0.5rem',
-    },
-    statLabel: {
-      color: 'var(--text-gray)',
-      fontSize: '0.95rem',
-      fontWeight: '500',
-    },
-    section: {
-      marginBottom: '2rem',
-    },
-    sectionTitle: {
-      fontSize: '1.5rem',
-      fontWeight: '700',
-      color: 'var(--text-dark)',
-      marginBottom: '1rem',
-    },
-    skillsContainer: {
-      backgroundColor: '#fff',
-      borderRadius: '12px',
-      padding: '1.5rem',
-      boxShadow: 'var(--shadow)',
-      border: '1px solid var(--border-light)',
-    },
-    skillInputGroup: {
-      display: 'flex',
-      gap: '0.5rem',
-      marginBottom: '1.5rem',
-    },
-    skillInput: {
-      flex: 1,
-      padding: '0.8rem 1rem',
-      border: '1px solid var(--border-light)',
-      borderRadius: '8px',
-      fontSize: '0.95rem',
-    },
-    addButton: {
-      padding: '0.8rem 1.2rem',
-      backgroundColor: 'var(--accent-purple)',
-      color: '#fff',
-      border: 'none',
-      borderRadius: '8px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      transition: 'all 0.3s ease',
-    },
-    skillsList: {
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: '0.7rem',
-    },
-    skillTag: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '0.5rem',
-      backgroundColor: '#eef2ff',
-      color: '#3730a3',
-      padding: '0.6rem 1rem',
-      borderRadius: '20px',
-      fontSize: '0.9rem',
-      fontWeight: '600',
-      border: '1px solid #c7d2fe',
-    },
-    removeSkillBtn: {
-      background: 'none',
-      border: 'none',
-      color: '#000',
-      cursor: 'pointer',
-      fontSize: '1.1rem',
-      padding: '0',
-      display: 'flex',
-      alignItems: 'center',
-      transition: 'color 0.2s ease',
-    },
-    suggestedSkills: {
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: '0.5rem',
-      marginTop: '1rem',
-      paddingTop: '1rem',
-      borderTop: '1px solid var(--border-light)',
-    },
-    skillSuggestion: {
-      padding: '0.5rem 1rem',
-      backgroundColor: '#f3f4f6',
-      color: 'var(--text-dark)',
-      border: '1px solid var(--border-light)',
-      borderRadius: '20px',
-      cursor: 'pointer',
-      fontSize: '0.9rem',
-      transition: 'all 0.3s ease',
-    },
-    projectsGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-      gap: '1.5rem',
-    },
-    projectCard: {
-      backgroundColor: '#fff',
-      borderRadius: '12px',
-      padding: '1.5rem',
-      boxShadow: 'var(--shadow)',
-      border: '1px solid var(--border-light)',
-      transition: 'all 0.3s ease',
-    },
-    projectTitle: {
-      fontSize: '1.1rem',
-      fontWeight: '700',
-      color: 'var(--text-dark)',
-      marginBottom: '0.5rem',
-    },
-    projectClient: {
-      color: 'var(--text-gray)',
-      fontSize: '0.9rem',
-      marginBottom: '0.5rem',
-    },
-    projectBudget: {
-      fontWeight: '700',
-      color: 'var(--accent-purple)',
-      fontSize: '1.1rem',
-    },
-    emptyState: {
-      textAlign: 'center',
-      padding: '3rem 2rem',
-      backgroundColor: '#fff',
-      borderRadius: '12px',
-      color: 'var(--text-gray)',
-    },
-    emptyIcon: {
-      fontSize: '3rem',
-      marginBottom: '1rem',
-    },
-    loadingContainer: {
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '300px',
-      fontSize: '1.1rem',
-      color: 'var(--text-gray)',
-    },
-    errorMessage: {
-      padding: '1rem',
-      backgroundColor: '#fee2e2',
-      color: '#b91c1c',
-      borderRadius: '8px',
-      marginBottom: '1rem',
-      border: '1px solid #fecaca',
-    },
-  };
-
   return (
     <div style={styles.container}>
       <div style={styles.content}>
+        
         {/* Header */}
         <div style={styles.header}>
           <div style={styles.headerInfo}>
@@ -464,9 +214,7 @@ const ExpertDashboard = () => {
                   <button
                     key={skill}
                     style={styles.skillSuggestion}
-                    onClick={() => {
-                      setNewSkill(skill);
-                    }}
+                    onClick={() => setNewSkill(skill)}
                     onMouseEnter={(e) => {
                       e.target.style.backgroundColor = 'var(--accent-purple)';
                       e.target.style.color = '#fff';
@@ -515,9 +263,257 @@ const ExpertDashboard = () => {
             </div>
           )}
         </div>
+        
       </div>
     </div>
   );
+};
+
+// ==========================================
+// STYLES
+// Extracted outside the component to prevent 
+// re-initialization on every render
+// ==========================================
+const styles = {
+  container: {
+    minHeight: 'calc(100vh - 80px)',
+    backgroundColor: 'var(--bg-light)',
+    padding: '2rem',
+  },
+  content: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '2rem',
+    flexWrap: 'wrap',
+    gap: '1rem',
+  },
+  headerInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
+  },
+  avatar: {
+    width: '60px',
+    height: '60px',
+    borderRadius: '50%',
+    backgroundColor: 'var(--accent-purple)',
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '1.8rem',
+    fontWeight: '700',
+  },
+  headerText: {
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  welcomeTitle: {
+    fontSize: '1.8rem',
+    fontWeight: '700',
+    color: 'var(--text-dark)',
+  },
+  userRole: {
+    fontSize: '0.9rem',
+    color: 'var(--text-gray)',
+  },
+  ratingDisplay: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    marginTop: '0.3rem',
+    fontSize: '0.95rem',
+  },
+  buttonGroup: {
+    display: 'flex',
+    gap: '0.5rem',
+  },
+  button: {
+    padding: '0.7rem 1.2rem',
+    backgroundColor: 'var(--accent-purple)',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    textDecoration: 'none',
+    display: 'inline-block',
+    transition: 'all 0.3s ease',
+  },
+  secondaryButton: {
+    backgroundColor: '#e5e7eb',
+    color: 'var(--text-dark)',
+  },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '1rem',
+    marginBottom: '2rem',
+  },
+  statCard: {
+    backgroundColor: '#fff',
+    padding: '1.5rem',
+    borderRadius: '12px',
+    boxShadow: 'var(--shadow)',
+    textAlign: 'center',
+    border: '1px solid var(--border-light)',
+  },
+  statValue: {
+    fontSize: '2.5rem',
+    fontWeight: '800',
+    color: 'var(--accent-purple)',
+    marginBottom: '0.5rem',
+  },
+  statLabel: {
+    color: 'var(--text-gray)',
+    fontSize: '0.95rem',
+    fontWeight: '500',
+  },
+  section: {
+    marginBottom: '2rem',
+  },
+  sectionTitle: {
+    fontSize: '1.5rem',
+    fontWeight: '700',
+    color: 'var(--text-dark)',
+    marginBottom: '1rem',
+  },
+  skillsContainer: {
+    backgroundColor: '#fff',
+    borderRadius: '12px',
+    padding: '1.5rem',
+    boxShadow: 'var(--shadow)',
+    border: '1px solid var(--border-light)',
+  },
+  skillInputGroup: {
+    display: 'flex',
+    gap: '0.5rem',
+    marginBottom: '1.5rem',
+  },
+  skillInput: {
+    flex: 1,
+    padding: '0.8rem 1rem',
+    border: '1px solid var(--border-light)',
+    borderRadius: '8px',
+    fontSize: '0.95rem',
+  },
+  addButton: {
+    padding: '0.8rem 1.2rem',
+    backgroundColor: 'var(--accent-purple)',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+  },
+  skillsList: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '0.7rem',
+  },
+  skillTag: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    backgroundColor: '#eef2ff',
+    color: '#3730a3',
+    padding: '0.6rem 1rem',
+    borderRadius: '20px',
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    border: '1px solid #c7d2fe',
+  },
+  removeSkillBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#000',
+    cursor: 'pointer',
+    fontSize: '1.1rem',
+    padding: '0',
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'color 0.2s ease',
+  },
+  suggestedSkills: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '0.5rem',
+    marginTop: '1rem',
+    paddingTop: '1rem',
+    borderTop: '1px solid var(--border-light)',
+  },
+  skillSuggestion: {
+    padding: '0.5rem 1rem',
+    backgroundColor: '#f3f4f6',
+    color: 'var(--text-dark)',
+    border: '1px solid var(--border-light)',
+    borderRadius: '20px',
+    cursor: 'pointer',
+    fontSize: '0.9rem',
+    transition: 'all 0.3s ease',
+  },
+  projectsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+    gap: '1.5rem',
+  },
+  projectCard: {
+    backgroundColor: '#fff',
+    borderRadius: '12px',
+    padding: '1.5rem',
+    boxShadow: 'var(--shadow)',
+    border: '1px solid var(--border-light)',
+    transition: 'all 0.3s ease',
+  },
+  projectTitle: {
+    fontSize: '1.1rem',
+    fontWeight: '700',
+    color: 'var(--text-dark)',
+    marginBottom: '0.5rem',
+  },
+  projectClient: {
+    color: 'var(--text-gray)',
+    fontSize: '0.9rem',
+    marginBottom: '0.5rem',
+  },
+  projectBudget: {
+    fontWeight: '700',
+    color: 'var(--accent-purple)',
+    fontSize: '1.1rem',
+  },
+  emptyState: {
+    textAlign: 'center',
+    padding: '3rem 2rem',
+    backgroundColor: '#fff',
+    borderRadius: '12px',
+    color: 'var(--text-gray)',
+  },
+  emptyIcon: {
+    fontSize: '3rem',
+    marginBottom: '1rem',
+  },
+  loadingContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: '300px',
+    fontSize: '1.1rem',
+    color: 'var(--text-gray)',
+  },
+  errorMessage: {
+    padding: '1rem',
+    backgroundColor: '#fee2e2',
+    color: '#b91c1c',
+    borderRadius: '8px',
+    marginBottom: '1rem',
+    border: '1px solid #fecaca',
+  },
 };
 
 export default ExpertDashboard;
