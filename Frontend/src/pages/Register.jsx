@@ -9,6 +9,7 @@ const Register = () => {
   const [validationError, setValidationError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // 👇 This was the missing function causing the blank screen! 👇
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setValidationError('');
@@ -31,8 +32,12 @@ const Register = () => {
 
     try {
       await register(formData);
-      setSuccess('Registration successful! Redirecting...');
-      setTimeout(() => navigate('/'), 1500);
+      
+      setSuccess('Account created! Redirecting to login to verify your email...');
+      
+      // Change '/' to '/login' so they are forced to go through 2FA!
+      setTimeout(() => navigate('/login'), 2000); 
+      
     } catch (err) {
       setValidationError(err.response?.data?.message || 'Registration failed');
     }

@@ -24,6 +24,7 @@ exports.register = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email already registered' });
     }
 
+    // Create the user in the database
     const user = await User.create({
       name,
       email,
@@ -31,19 +32,13 @@ exports.register = async (req, res) => {
       role,
     });
 
-    const token = generateToken(user);
-
+    // 🛑 THE FIX: We DO NOT generate a token here anymore!
+    // Instead, we just tell the frontend that the account was created successfully.
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+      message: 'Account created successfully! Please log in to verify your email.',
     });
+    
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error registering user', error: error.message });
   }
