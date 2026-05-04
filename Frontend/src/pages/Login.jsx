@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
+import axios from 'axios'; // We use axios directly here to handle the 2-step process
 
 const Login = () => {
-  const navigate = useNavigate();
-  const { login, loading, error } = useAuth();
   const [formData, setFormData] = useState({ email: '', password: '' });
+  const [otp, setOtp] = useState(''); // Stores the OTP code
+  const [showOTP, setShowOTP] = useState(false); // Controls which screen to show
+  
+  const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -14,7 +16,8 @@ const Login = () => {
     setValidationError('');
   };
 
-  const handleSubmit = async (e) => {
+  // STEP 1: Verify Password & Send Email
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setValidationError('');
     setSuccess('');
@@ -24,12 +27,63 @@ const Login = () => {
       return;
     }
 
+    setLoading(true);
     try {
-      await login(formData.email, formData.password);
-      setSuccess('Login successful! Redirecting...');
-      setTimeout(() => navigate('/'), 1500);
+      const res = await axios.post('http://localhost:5000/api/auth/login', formData);
+      
+      if (res.data.requiresOTP) {
+        setSuccess('Password accepted! OTP sent to your email.');
+        setShowOTP(true); // Switch to the OTP screen!
+      }
     } catch (err) {
       setValidationError(err.response?.data?.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // STEP 2: Verify OTP & Redirect to Dashboard
+  const handleOTPSubmit = async (e) => {
+    e.preventDefault();
+    setValidationError('');
+    setSuccess('');
+
+    if (!otp) {
+      setValidationError('Please enter the OTP sent to your email');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await axios.post('http://localhost:5000/api/auth/verify-login-otp', {
+        email: formData.email,
+        otp: otp
+      });
+
+      if (res.data.success) {
+        setSuccess('Verification successful! Redirecting...');
+        
+        // Save the token and user data so your Context picks it up
+        localStorage.setItem('token', res.data.token);
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+
+        const userRole = res.data.user.role;
+
+        // Route them to the correct dashboard based on their role!
+        setTimeout(() => {
+          if (userRole === 'Admin' || userRole === 'admin') {
+            window.location.href = '/admin-dashboard';
+          } else if (userRole === 'Expert' || userRole === 'expert') {
+            window.location.href = '/expert-dashboard';
+          } else {
+            window.location.href = '/client-dashboard';
+          }
+        }, 1500);
+      }
+    } catch (err) {
+      setValidationError(err.response?.data?.message || 'Invalid or expired OTP');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -100,9 +154,6 @@ const Login = () => {
       marginTop: '1rem',
       transition: 'all 0.3s ease',
     },
-    buttonHover: {
-      backgroundColor: 'var(--primary-dark)',
-    },
     buttonDisabled: {
       opacity: 0.7,
       cursor: 'not-allowed',
@@ -114,6 +165,7 @@ const Login = () => {
       borderRadius: '8px',
       fontSize: '0.9rem',
       border: '1px solid #fecaca',
+      marginBottom: '1rem',
     },
     successMessage: {
       padding: '0.75rem 1rem',
@@ -122,6 +174,7 @@ const Login = () => {
       borderRadius: '8px',
       fontSize: '0.9rem',
       border: '1px solid #bbf7d0',
+      marginBottom: '1rem',
     },
     footer: {
       marginTop: '1.5rem',
@@ -135,85 +188,95 @@ const Login = () => {
       fontWeight: '600',
       marginLeft: '0.25rem',
     },
-    loadingSpinner: {
-      display: 'inline-block',
-      width: '1rem',
-      height: '1rem',
-      border: '2px solid rgba(255,255,255,0.3)',
-      borderRadius: '50%',
-      borderTop: '2px solid #fff',
-      animation: 'spin 0.6s linear infinite',
-      marginRight: '0.5rem',
-    },
   };
 
   return (
     <div style={styles.container}>
-      <style>
-        {`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}
-      </style>
       <div style={styles.formCard}>
+        
+        {/* Toggle the header text based on which step we are on */}
         <div style={styles.header}>
-          <h2 style={styles.title}>Welcome Back</h2>
-          <p style={styles.subtitle}>Log in to your SkillBridge account</p>
+          <h2 style={styles.title}>{!showOTP ? "Welcome Back" : "Two-Step Verification"}</h2>
+          <p style={styles.subtitle}>
+            {!showOTP ? "Log in to your SkillBridge account" : "Check your email for the 6-digit code"}
+          </p>
         </div>
 
-        {error && <div style={styles.errorMessage}>{error}</div>}
         {validationError && <div style={styles.errorMessage}>{validationError}</div>}
         {success && <div style={styles.successMessage}>{success}</div>}
 
-        <form style={styles.form} onSubmit={handleSubmit}>
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Email</label>
-            <input
-              type="email"
-              name="email"
-              placeholder="your@university.edu"
-              style={styles.input}
-              value={formData.email}
-              onChange={handleChange}
+        {/* STEP 1: The Email/Password Form */}
+        {!showOTP ? (
+          <form style={styles.form} onSubmit={handleLoginSubmit}>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Email</label>
+              <input
+                type="email"
+                name="email"
+                placeholder="your@email.com"
+                style={styles.input}
+                value={formData.email}
+                onChange={handleChange}
+                disabled={loading}
+              />
+            </div>
+
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Password</label>
+              <input
+                type="password"
+                name="password"
+                placeholder="Enter your password"
+                style={styles.input}
+                value={formData.password}
+                onChange={handleChange}
+                disabled={loading}
+              />
+            </div>
+
+            <button
+              type="submit"
+              style={{ ...styles.button, ...(loading ? styles.buttonDisabled : {}) }}
               disabled={loading}
-            />
-          </div>
+            >
+              {loading ? '🔄 Checking...' : 'Login'}
+            </button>
+          </form>
+        ) : (
+          
+          /* STEP 2: The OTP Verification Form */
+          <form style={styles.form} onSubmit={handleOTPSubmit}>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Verification Code (OTP)</label>
+              <input
+                type="text"
+                placeholder="Enter 6-digit code"
+                style={{...styles.input, textAlign: 'center', fontSize: '1.2rem', letterSpacing: '2px'}}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                disabled={loading}
+                maxLength="6"
+              />
+            </div>
 
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Password</label>
-            <input
-              type="password"
-              name="password"
-              placeholder="Enter your password"
-              style={styles.input}
-              value={formData.password}
-              onChange={handleChange}
+            <button
+              type="submit"
+              style={{ ...styles.button, backgroundColor: 'var(--primary-dark)', ...(loading ? styles.buttonDisabled : {}) }}
               disabled={loading}
-            />
-          </div>
+            >
+              {loading ? '🔄 Verifying...' : 'Verify & Enter Dashboard'}
+            </button>
+          </form>
+        )}
 
-          <button
-            type="submit"
-            style={{
-              ...styles.button,
-              ...(loading ? styles.buttonDisabled : {}),
-            }}
-            disabled={loading}
-            onMouseEnter={(e) => !loading && (e.target.style.backgroundColor = 'var(--primary-dark)')}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = 'var(--primary-blue)')}
-          >
-            {loading ? '🔄 Logging in...' : 'Login'}
-          </button>
-        </form>
-
-        <p style={styles.footer}>
-          Don't have an account?
-          <Link to="/register" style={styles.footerLink}>
-            Sign up here
-          </Link>
-        </p>
+        {!showOTP && (
+          <p style={styles.footer}>
+            Don't have an account?
+            <Link to="/register" style={styles.footerLink}>
+              Sign up here
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );
