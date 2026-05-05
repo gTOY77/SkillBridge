@@ -69,6 +69,7 @@ export const projectAPI = {
     return api.get(`/projects/search?${params}`);
   },
   placeBid: (projectId, data) => api.post(`/projects/${projectId}/bid`, data),
+  completeProject: (id, notes) => api.put(`/projects/${id}/complete`, { notes }),
 };
 
 // Skill endpoints
@@ -86,6 +87,15 @@ export const messageAPI = {
   getMessages: (conversationId, page = 1) => api.get(`/messages/${conversationId}?page=${page}`),
   archiveConversation: (conversationId, archive) => api.put(`/messages/conversation/${conversationId}/archive`, { archive }),
   deleteConversation: (conversationId) => api.delete(`/messages/conversation/${conversationId}`),
+};
+
+// Bid endpoints
+export const bidAPI = {
+  placeBid: (projectId, data) => api.post(`/bids/${projectId}`, data),
+  getProjectBids: (projectId) => api.get(`/bids/project/${projectId}`),
+  getExpertBids: () => api.get('/bids/expert'),
+  selectBid: (bidId) => api.put(`/bids/${bidId}/select`),
+  getNotifications: () => api.get('/bids/notifications'),
 };
 
 export default api;

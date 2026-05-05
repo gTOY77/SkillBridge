@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const Message = require('./models/Message');
 const Conversation = require('./models/Conversation');
 const User = require('./models/User');
+const Notification = require('./models/Notification');
 
 const setupSocket = (server) => {
   const io = socketio(server, {
@@ -38,7 +39,7 @@ const setupSocket = (server) => {
 
     socket.on('joinConversation', (conversationId) => {
       socket.join(conversationId);
-      console.log(`User ${socket.userId} joined room: ${conversationId}`);
+      console.log(`User ${socket.userId} joined conversation room: ${conversationId}`);
       
       // Update unread count for the user joining
       Conversation.findById(conversationId).then(conv => {
@@ -47,6 +48,11 @@ const setupSocket = (server) => {
           conv.save();
         }
       });
+    });
+
+    socket.on('joinProject', (projectId) => {
+      socket.join(`project_${projectId}`);
+      console.log(`User ${socket.userId} joined project room: project_${projectId}`);
     });
 
     socket.on('sendMessage', async (data) => {
@@ -121,6 +127,44 @@ const setupSocket = (server) => {
       const receiverSocketId = onlineUsers.get(receiverId);
       if (receiverSocketId) {
         io.to(receiverSocketId).emit('userTyping', { conversationId, userId: socket.userId });
+      }
+    });
+
+    // Bidding notifications
+    socket.on('newBid', async (data) => {
+      const { recipientId, notification, projectId } = data;
+      
+      // Ensure senderId is included in the notification payload
+      const enhancedNotification = {
+        ...notification,
+        senderId: socket.userId,
+        createdAt: new Date().toISOString()
+      };
+
+      const recipientSocketId = onlineUsers.get(recipientId);
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit('notification', enhancedNotification);
+      }
+
+      // Broadcast to project room for real-time bid count updates
+      if (projectId) {
+        io.to(`project_${projectId}`).emit('bidCountUpdate', { projectId });
+      }
+    });
+
+    socket.on('bidSelected', async (data) => {
+      const { recipientId, notification } = data;
+      const recipientSocketId = onlineUsers.get(recipientId);
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit('notification', notification);
+      }
+    });
+
+    socket.on('projectCompleted', async (data) => {
+      const { recipientId, notification } = data;
+      const recipientSocketId = onlineUsers.get(recipientId);
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit('notification', notification);
       }
     });
 

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { projectAPI } from '../services/api';
+import { projectAPI, bidAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useMessages } from '../context/MessageContext';
 
 const ClientDashboard = () => {
   const { user } = useAuth();
+  const { socket } = useMessages();
   const [projects, setProjects] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [stats, setStats] = useState({
@@ -20,8 +23,42 @@ const ClientDashboard = () => {
   useEffect(() => {
     if (userId) {
       fetchProjects();
+      fetchNotifications();
     }
   }, [userId]);
+
+  useEffect(() => {
+    if (socket) {
+      socket.on('notification', (notif) => {
+        setNotifications(prev => [notif, ...prev]);
+        
+        // Real-time Dashboard Updates
+        if (notif.type === 'project_update' && notif.data?.status === 'completed') {
+          // Increment completed projects and decrement active
+          setStats(prev => ({
+            ...prev,
+            activeProjects: Math.max(0, prev.activeProjects - 1),
+            completedProjects: prev.completedProjects + 1
+          }));
+          
+          // Refresh projects list to update UI
+          fetchProjects();
+        } else {
+          fetchProjects(); // Generic refresh for other updates
+        }
+      });
+      return () => socket.off('notification');
+    }
+  }, [socket]);
+
+  const fetchNotifications = async () => {
+    try {
+      const response = await bidAPI.getNotifications();
+      setNotifications(response.data.data);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+    }
+  };
 
   const fetchProjects = async () => {
     try {
@@ -259,6 +296,28 @@ const ClientDashboard = () => {
       marginBottom: '1rem',
       border: '1px solid #fecaca',
     },
+    notifSection: {
+      marginBottom: '2rem',
+      backgroundColor: '#fff',
+      padding: '1.5rem',
+      borderRadius: '12px',
+      boxShadow: 'var(--shadow)',
+    },
+    notifItem: {
+      padding: '1rem',
+      borderBottom: '1px solid #f1f5f9',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '1rem',
+      textDecoration: 'none',
+      color: 'inherit',
+    },
+    notifBadge: {
+      width: '10px',
+      height: '10px',
+      borderRadius: '50%',
+      backgroundColor: 'var(--primary-blue)',
+    }
   };
 
   const getStatusStyle = (status) => {
@@ -297,6 +356,24 @@ const ClientDashboard = () => {
         </div>
 
         {error && <div style={styles.errorMessage}>{error}</div>}
+
+        {/* Real-time Notifications */}
+        {notifications.length > 0 && (
+          <div style={styles.notifSection}>
+            <h3 style={{ marginBottom: '1rem' }}>🔔 Recent Notifications</h3>
+            <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+              {notifications.slice(0, 5).map((notif, idx) => (
+                <Link key={idx} to={notif.link || '#'} style={styles.notifItem}>
+                  {!notif.isRead && <div style={styles.notifBadge} />}
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{notif.title}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{notif.content}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Stats */}
         <div style={styles.statsGrid}>
@@ -357,22 +434,12 @@ const ClientDashboard = () => {
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button style={{ ...styles.button, flex: 1, fontSize: '0.9rem' }}>
-                      👥 {project.bids?.length || 0} Bids
-                    </button>
                     <Link 
-                    to={`/edit-project/${project._id}`} 
-                    style={{ 
-                    ...styles.button, 
-                    ...styles.secondaryButton, 
-                    flex: 1, 
-                    fontSize: '0.9rem',
-                    textAlign: 'center',
-                    boxSizing: 'border-box'
-                }}
-              >
-                  Edit
-                  </Link>
+                      to={`/projects/${project._id}`}
+                      style={{ ...styles.button, flex: 1, fontSize: '0.9rem', textAlign: 'center' }}
+                    >
+                      👥 {project.bidCount || 0} Bids / View Details
+                    </Link>
                   </div>
                 </div>
               ))}

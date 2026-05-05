@@ -320,7 +320,7 @@ const BrowseProjects = () => {
 
                     <div style={styles.projectMeta}>
                       <span style={{ color: 'var(--text-gray)' }}>
-                        👥 {project.bids?.length || 0} bids
+                        👥 {project.bidCount || 0} bids
                       </span>
                     </div>
 

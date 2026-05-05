@@ -8,6 +8,7 @@ const {
   deleteProject,
   searchProjects,
   placeBid,
+  completeProject,
 } = require('../controllers/projectController');
 const { auth } = require('../middleware/auth');
 
@@ -18,5 +19,6 @@ router.get('/:id', getProjectById);
 router.put('/:id', auth, updateProject);
 router.delete('/:id', auth, deleteProject);
 router.post('/:id/bid', auth, placeBid);
+router.put('/:id/complete', auth, completeProject);
 
 module.exports = router;

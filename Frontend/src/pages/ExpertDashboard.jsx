@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { userAPI, projectAPI } from '../services/api';
+import { userAPI, projectAPI, bidAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useMessages } from '../context/MessageContext';
 
 const ExpertDashboard = () => {
   const { user } = useAuth();
+  const { socket } = useMessages();
   const [skills, setSkills] = useState([]);
   const [profile, setProfile] = useState(user);
   const [projects, setProjects] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [newSkill, setNewSkill] = useState('');
@@ -26,72 +29,139 @@ const ExpertDashboard = () => {
     totalEarnings: 0,
   });
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const userId = user?._id || user?.id;
-      if (!userId) return;
+  const [submitting, setSubmitting] = useState(false);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [selectedProjectForComplete, setSelectedProjectForComplete] = useState(null);
+  const [completionNotes, setCompletionNotes] = useState('');
 
-      try {
-        setLoading(true);
-        setError('');
-        
-        let currentProfile = user;
-        const profileResponse = await userAPI.getProfile(userId);
-        
-        if (profileResponse?.data?.user) {
-          currentProfile = profileResponse.data.user;
-          setProfile(currentProfile);
-        }
+  const fetchData = async () => {
+    const userId = user?._id || user?.id;
+    if (!userId) return;
 
-        // Fetch all projects to find ones the expert has bid on
-        const projectResponse = await projectAPI.getProjects(1, 100);
-        const allProjects = projectResponse.data.projects || [];
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Fetch Notifications
+      const notifRes = await bidAPI.getNotifications();
+      setNotifications(notifRes.data.data);
 
-        // Find bids made by this expert
-        const bidsToProjects = [];
-        allProjects.forEach(project => {
-          project.bids?.forEach(bid => {
-            if (String(bid.userId) === String(userId)) {
-              bidsToProjects.push(project);
-            }
-          });
-        });
+      // Fetch Expert's Bids
+      const bidsRes = await bidAPI.getExpertBids();
+      const expertBids = bidsRes.data.data || [];
 
-        setProjects(bidsToProjects);
-        setSkills(currentProfile?.skills || []);
-
-        // Calculate stats
-        setStats({
-          totalSkills: currentProfile?.skills?.length || 0,
-          bidsMade: bidsToProjects.length,
-          projectsWon: bidsToProjects.filter(p => p.assignedTo?._id === userId).length,
-          totalEarnings: bidsToProjects
-            .filter(p => p.assignedTo?._id === userId)
-            .reduce((sum, p) => sum + (p.budget || 0), 0),
-        });
-
-      } catch (err) {
-        setError('Failed to load data');
-        console.error('Dashboard Fetch Error:', err);
-      } finally {
-        setLoading(false);
+      let currentProfile = user;
+      const profileResponse = await userAPI.getProfile(userId);
+      
+      if (profileResponse?.data?.user) {
+        currentProfile = profileResponse.data.user;
+        setProfile(currentProfile);
       }
-    };
 
+      // Map bids to project objects for the UI
+      const bidsToProjects = expertBids.map(bid => ({
+        ...bid.projectId,
+        bidStatus: bid.status,
+        bidAmount: bid.bidAmount
+      })).filter(p => p !== null);
+
+      setProjects(bidsToProjects);
+      setSkills(currentProfile?.skills || []);
+
+      // Calculate stats
+      setStats({
+        totalSkills: currentProfile?.skills?.length || 0,
+        bidsMade: expertBids.length,
+        projectsWon: expertBids.filter(b => b.status === 'selected').length,
+        totalEarnings: expertBids
+          .filter(b => b.status === 'selected')
+          .reduce((sum, b) => sum + (b.bidAmount || 0), 0),
+      });
+
+    } catch (err) {
+      setError('Failed to load data');
+      console.error('Dashboard Fetch Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, [user?._id, user?.id]);
 
+  useEffect(() => {
+    if (socket) {
+      const handleNotification = (notif) => {
+        setNotifications(prev => [notif, ...prev]);
+        
+        // Granular Real-time Stat Updates
+        if (notif.type === 'new_bid' && String(notif.senderId) === String(user._id)) {
+          setStats(prev => ({
+            ...prev,
+            bidsMade: prev.bidsMade + 1
+          }));
+        }
+
+        if (notif.type === 'bid_selected') {
+          // If the notification data contains the award amount
+          const awardAmount = notif.data?.budget ? parseFloat(notif.data.budget) : 0;
+          setStats(prev => ({
+            ...prev,
+            projectsWon: prev.projectsWon + 1,
+            totalEarnings: prev.totalEarnings + awardAmount
+          }));
+          
+          // Also fetch projects to update the list without reload
+          fetchData();
+        }
+      };
+
+      socket.on('notification', handleNotification);
+      return () => socket.off('notification', handleNotification);
+    }
+  }, [socket, user?._id]);
+
   const handleAddSkill = async () => {
     if (!newSkill.trim()) return;
+    // ... rest of handleAddSkill logic ...
+  };
 
+  const handleCompleteProject = async () => {
+    if (!selectedProjectForComplete) return;
+    
     try {
-      const userId = user?._id || user?.id;
-      const updatedUser = await userAPI.addSkill(userId, { skillName: newSkill });
-      setSkills(updatedUser.data.skills || []);
-      setNewSkill('');
-      setStats(prev => ({ ...prev, totalSkills: (prev.totalSkills + 1) }));
+      setSubmitting(true);
+      const response = await projectAPI.completeProject(selectedProjectForComplete._id, completionNotes);
+      
+        if (response.data.success) {
+        if (socket) {
+          socket.emit('projectCompleted', {
+            recipientId: selectedProjectForComplete.createdBy._id || selectedProjectForComplete.createdBy,
+            notification: {
+              type: 'project_update',
+              title: 'Project Completed',
+              content: `Your project "${selectedProjectForComplete.title}" has been marked as completed by the expert.`,
+              link: `/projects/${selectedProjectForComplete._id}`,
+              senderId: user?._id || user?.id,
+              data: { 
+                projectId: selectedProjectForComplete._id.toString(), 
+                status: 'completed' 
+              }
+            }
+          });
+        }
+        
+        setShowCompleteModal(false);
+        setCompletionNotes('');
+        setSelectedProjectForComplete(null);
+        fetchData();
+        alert('Project marked as completed!');
+      }
     } catch (err) {
-      setError('Failed to add skill');
+      alert(err.response?.data?.message || 'Error completing project');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -130,6 +200,24 @@ const ExpertDashboard = () => {
         </div>
 
         {error && <div style={styles.errorMessage}>{error}</div>}
+
+        {/* Real-time Notifications */}
+        {notifications.length > 0 && (
+          <div style={styles.notifSection}>
+            <h3 style={{ marginBottom: '1rem' }}>🔔 Recent Notifications</h3>
+            <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+              {notifications.slice(0, 5).map((notif, idx) => (
+                <Link key={idx} to={notif.link || '#'} style={styles.notifItem}>
+                  {!notif.isRead && <div style={styles.notifBadge} />}
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{notif.title}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{notif.content}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Stats */}
         <div style={styles.statsGrid}>
@@ -231,38 +319,105 @@ const ExpertDashboard = () => {
           </div>
         </div>
 
-        {/* Active Bids Section */}
+        {/* Projects Section */}
         <div style={styles.section}>
-          <div style={styles.sectionTitle}>📊 Your Active Bids</div>
+          <div style={styles.sectionTitle}>📋 Your Projects & Bids</div>
 
           {loading ? (
-            <div style={styles.loadingContainer}>🔄 Loading your bids...</div>
+            <div style={styles.loadingContainer}>🔄 Loading your projects...</div>
           ) : projects.length === 0 ? (
             <div style={styles.emptyState}>
               <div style={styles.emptyIcon}>🎯</div>
-              <h3>No active bids yet</h3>
+              <h3>No activity yet</h3>
               <p>Browse available projects and submit your bids</p>
-              <button style={styles.button}>
+              <Link to="/projects" style={styles.button}>
                 🔍 Browse Projects
-              </button>
+              </Link>
             </div>
           ) : (
             <div style={styles.projectsGrid}>
               {projects.map((project) => (
                 <div key={project._id} style={styles.projectCard}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                    <div style={styles.projectCategory}>{project.category}</div>
+                    <div style={{ 
+                      padding: '0.3rem 0.6rem', 
+                      borderRadius: '4px', 
+                      fontSize: '0.75rem', 
+                      fontWeight: '700',
+                      backgroundColor: project.status === 'completed' ? '#dcfce7' : project.status === 'in-progress' ? '#fef3c7' : '#f3f4f6',
+                      color: project.status === 'completed' ? '#166534' : project.status === 'in-progress' ? '#92400e' : '#64748b'
+                    }}>
+                      {project.status.toUpperCase()}
+                    </div>
+                  </div>
                   <div style={styles.projectTitle}>{project.title}</div>
                   <div style={styles.projectClient}>
-                    From: {project.createdBy?.name || 'Unknown Client'}
+                    Client: {project.createdBy?.name || 'Unknown'}
                   </div>
-                  <div style={styles.projectBudget}>💰 ${project.budget}</div>
-                  <div style={{ color: 'var(--text-gray)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-                    Skills: {project.skillsRequired?.join(', ') || 'N/A'}
+                  <div style={styles.projectBudget}>💰 Budget: ${project.budget}</div>
+                  <div style={{ color: 'var(--text-gray)', fontSize: '0.9rem', marginTop: '0.5rem', flex: 1 }}>
+                    {project.description.length > 100 ? project.description.substring(0, 100) + '...' : project.description}
+                  </div>
+                  
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem' }}>
+                    <Link to={`/projects/${project._id}`} style={{ ...styles.button, flex: 1, fontSize: '0.85rem', textAlign: 'center' }}>
+                      View
+                    </Link>
+                    {project.status === 'in-progress' && 
+                     String(project.assignedTo?._id || project.assignedTo) === String(user?._id || user?.id) && (
+                      <button 
+                        onClick={() => {
+                          setSelectedProjectForComplete(project);
+                          setShowCompleteModal(true);
+                        }}
+                        style={{ ...styles.button, backgroundColor: '#16a34a', flex: 1, fontSize: '0.85rem' }}
+                      >
+                        Complete
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        {/* Completion Modal */}
+        {showCompleteModal && (
+          <div style={styles.modal}>
+            <div style={styles.modalContent}>
+              <h2 style={{ margin: 0, color: 'var(--text-dark)' }}>Mark as Completed</h2>
+              <p style={{ color: 'var(--text-gray)', marginTop: '1rem' }}>
+                Are you sure you want to mark "<strong>{selectedProjectForComplete?.title}</strong>" as completed? 
+                This will notify the client.
+              </p>
+              
+              <textarea 
+                style={styles.textarea}
+                placeholder="Optional: Add completion notes or remarks for the client..."
+                value={completionNotes}
+                onChange={(e) => setCompletionNotes(e.target.value)}
+              />
+              
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+                <button 
+                  onClick={() => setShowCompleteModal(false)}
+                  style={{ ...styles.button, ...styles.secondaryButton, flex: 1 }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleCompleteProject}
+                  disabled={submitting}
+                  style={{ ...styles.button, backgroundColor: '#16a34a', flex: 1, opacity: submitting ? 0.7 : 1 }}
+                >
+                  {submitting ? 'Updating...' : 'Confirm Completion'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         
       </div>
     </div>
@@ -369,10 +524,41 @@ const styles = {
     color: 'var(--accent-purple)',
     marginBottom: '0.5rem',
   },
+  notifSection: {
+    marginBottom: '2rem',
+    backgroundColor: '#fff',
+    padding: '1.5rem',
+    borderRadius: '12px',
+    boxShadow: 'var(--shadow)',
+  },
+  notifItem: {
+    padding: '1rem',
+    borderBottom: '1px solid #f1f5f9',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
+    textDecoration: 'none',
+    color: 'inherit',
+  },
+  notifBadge: {
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
+    backgroundColor: 'var(--primary-blue)',
+  },
   statLabel: {
     color: 'var(--text-gray)',
     fontSize: '0.95rem',
     fontWeight: '500',
+  },
+  modal: {
+    position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+  },
+  modalContent: {
+    backgroundColor: '#fff', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: '500px'
+  },
+  textarea: {
+    width: '100%', padding: '0.8rem', borderRadius: '8px', border: '1px solid #e2e8f0', minHeight: '100px', outline: 'none', marginTop: '1rem'
   },
   section: {
     marginBottom: '2rem',

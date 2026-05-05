@@ -1,4 +1,5 @@
 const Project = require('../models/Project');
+const Bid = require('../models/Bid');
 
 exports.createProject = async (req, res) => {
   try {
@@ -58,6 +59,15 @@ exports.getProjects = async (req, res) => {
       .limit(limit)
       .sort({ createdAt: -1 });
 
+    // Dynamically fetch bid counts for each project
+    const projectsWithBidCounts = await Promise.all(projects.map(async (project) => {
+      const bidCount = await Bid.countDocuments({ projectId: project._id.toString() });
+      return {
+        ...project.toObject(),
+        bidCount
+      };
+    }));
+
     const total = await Project.countDocuments();
 
     res.status(200).json({
@@ -65,7 +75,7 @@ exports.getProjects = async (req, res) => {
       total,
       page,
       pages: Math.ceil(total / limit),
-      projects,
+      projects: projectsWithBidCounts,
     });
   } catch (error) {
     res.status(500).json({
@@ -73,6 +83,58 @@ exports.getProjects = async (req, res) => {
       message: 'Error fetching projects',
       error: error.message,
     });
+  }
+};
+
+const Notification = require('../models/Notification');
+
+// @desc    Mark project as completed
+// @route   PUT /api/projects/:id/complete
+// @access  Private (Assigned Expert only)
+exports.completeProject = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    const userId = req.userId;
+
+    const project = await Project.findById(id);
+    if (!project) {
+      return res.status(404).json({ success: false, message: 'Project not found' });
+    }
+
+    // Validation: Only the assigned expert can mark as complete
+    if (!project.assignedTo || project.assignedTo.toString() !== userId) {
+      return res.status(403).json({ success: false, message: 'Not authorized to complete this project' });
+    }
+
+    if (project.status !== 'in-progress') {
+      return res.status(400).json({ success: false, message: 'Only in-progress projects can be completed' });
+    }
+
+    project.status = 'completed';
+    if (notes) {
+      project.description_detailed += `\n\n[Completion Note]: ${notes}`;
+    }
+    await project.save();
+
+    // Create Notification for Client
+    await Notification.create({
+      recipient: project.createdBy,
+      sender: userId,
+      type: 'project_update',
+      title: 'Project Completed',
+      content: `Your project "${project.title}" has been marked as completed by the expert.`,
+      link: `/projects/${project._id}`,
+      data: { projectId: project._id.toString(), status: 'completed' }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Project marked as completed',
+      project
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error completing project', error: error.message });
   }
 };
 
@@ -89,9 +151,16 @@ exports.getProjectById = async (req, res) => {
       });
     }
 
+    // Dynamically fetch bid count for this project
+    const bidCount = await Bid.countDocuments({ projectId: project._id.toString() });
+    console.log(`[DEBUG] Project ${project._id} count: ${bidCount}`);
+
     res.status(200).json({
       success: true,
-      project,
+      project: {
+        ...project.toObject(),
+        bidCount
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -197,10 +266,19 @@ exports.searchProjects = async (req, res) => {
       .populate('createdBy', 'name email')
       .sort({ createdAt: -1 });
 
+    // Dynamically fetch bid counts for each filtered project
+    const projectsWithBidCounts = await Promise.all(projects.map(async (project) => {
+      const bidCount = await Bid.countDocuments({ projectId: project._id.toString() });
+      return {
+        ...project.toObject(),
+        bidCount
+      };
+    }));
+
     res.status(200).json({
       success: true,
       count: projects.length,
-      projects,
+      projects: projectsWithBidCounts,
     });
   } catch (error) {
     res.status(500).json({
