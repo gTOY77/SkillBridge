@@ -2,6 +2,7 @@ const socketio = require('socket.io');
 const jwt = require('jsonwebtoken');
 const Message = require('./models/Message');
 const Conversation = require('./models/Conversation');
+const User = require('./models/User');
 
 const setupSocket = (server) => {
   const io = socketio(server, {
@@ -52,6 +53,28 @@ const setupSocket = (server) => {
       const { conversationId, receiverId, text, fileUrl, fileName, fileType, emoji } = data;
       
       try {
+        const sender = await User.findById(socket.userId);
+        const receiver = await User.findById(receiverId);
+
+        if (!receiver) return;
+
+        // Permission Check: Expert to Expert
+        if (sender.role === 'expert' && receiver.role === 'expert') {
+          console.log(`Blocked expert-to-expert message: ${socket.userId} -> ${receiverId}`);
+          return;
+        }
+
+        // Permission Check: Expert initiating with Client
+        if (sender.role === 'expert' && receiver.role === 'client') {
+          const existingConv = await Conversation.findOne({
+            participants: { $all: [socket.userId, receiverId] }
+          });
+          if (!existingConv) {
+            console.log(`Blocked expert-initiated conversation with client: ${socket.userId} -> ${receiverId}`);
+            return;
+          }
+        }
+
         // Find or create conversation
         let conversation = await Conversation.findById(conversationId);
         if (!conversation) {

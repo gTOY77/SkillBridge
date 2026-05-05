@@ -10,10 +10,23 @@ exports.sendMessage = async (req, res) => {
     const { receiverId, text, fileUrl, fileName, fileType, emoji } = req.body;
     const senderId = req.userId;
 
-    // Check if expert is trying to initiate conversation
     const sender = await User.findById(senderId);
-    if (sender.role === 'expert') {
-      // Find if there's already a conversation
+    const receiver = await User.findById(receiverId);
+
+    if (!receiver) {
+      return res.status(404).json({ success: false, message: 'Receiver not found' });
+    }
+
+    // Permission Check: Expert to Expert is forbidden
+    if (sender.role === 'expert' && receiver.role === 'expert') {
+      return res.status(403).json({
+        success: false,
+        message: 'Permission denied: Experts cannot message other experts.'
+      });
+    }
+
+    // Permission Check: Expert cannot initiate with Client
+    if (sender.role === 'expert' && receiver.role === 'client') {
       const existingConv = await Conversation.findOne({
         participants: { $all: [senderId, receiverId] }
       });
@@ -21,10 +34,13 @@ exports.sendMessage = async (req, res) => {
       if (!existingConv) {
         return res.status(403).json({
           success: false,
-          message: 'Experts cannot initiate conversations.'
+          message: 'Permission denied: Experts cannot initiate conversations with clients.'
         });
       }
     }
+
+    // Permission Check: Client to Expert is allowed (implicit by not blocking)
+    // Permission Check: Admin can message anyone (optional, but good practice)
 
     // Find or create conversation
     let conversation = await Conversation.findOne({

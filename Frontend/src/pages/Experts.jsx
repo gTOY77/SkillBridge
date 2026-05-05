@@ -590,12 +590,14 @@ const Experts = () => {
               </div> {/* <-- This safely closes the modalBody */}
 
               <div style={styles.modalActions}>
-                <button 
-                  style={styles.messageButton} 
-                  onClick={() => openChat(selectedExpert)}
-                >
-                  ✉️ Message
-                </button>
+                {(user?.role === 'client' || user?.role === 'Client') && (
+                  <button 
+                    style={styles.messageButton} 
+                    onClick={() => openChat(selectedExpert)}
+                  >
+                    ✉️ Message
+                  </button>
+                )}
                 <button style={styles.closeButton} onClick={() => setSelectedExpert(null)}>
                   Close
                 </button>
