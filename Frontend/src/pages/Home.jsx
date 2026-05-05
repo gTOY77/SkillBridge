@@ -374,13 +374,13 @@ const Home = () => {
                 </div>
 
                 {user && user.role === 'expert' ? (
-                  <button style={styles.projectLink}>
+                  <Link to={`/projects/${project._id}`} style={styles.projectLink}>
                     Place Bid on Project
-                  </button>
+                  </Link>
                 ) : user ? (
-                  <button style={styles.projectLink} disabled>
+                  <Link to={`/projects/${project._id}`} style={styles.projectLink}>
                     View Project Details
-                  </button>
+                  </Link>
                 ) : (
                   <Link to="/login" style={styles.projectLink}>
                     Login to View
