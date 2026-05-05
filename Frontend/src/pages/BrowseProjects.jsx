@@ -167,7 +167,7 @@ const BrowseProjects = () => {
       fontSize: '0.85rem',
     },
     projectLink: {
-      display: 'inline-block',
+      display: 'block',
       backgroundColor: 'var(--primary-blue)',
       color: '#fff',
       padding: '0.7rem 1.2rem',
@@ -179,6 +179,7 @@ const BrowseProjects = () => {
       border: 'none',
       width: '100%',
       transition: 'all 0.3s ease',
+      boxSizing: 'border-box',
     },
     loadingContainer: {
       display: 'flex',
@@ -271,8 +272,22 @@ const BrowseProjects = () => {
               </button>
             ))}
           </div>
+          <Link 
+            to="/create-project" 
+            style={{ 
+              backgroundColor: '#16a34a', 
+              color: 'white', 
+              padding: '0.6rem 1.2rem', 
+              borderRadius: '8px', 
+              textDecoration: 'none', 
+              fontWeight: 'bold',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+          >
+            + Post a Project
+          </Link>
         </div>
-
+        
         {error && <div style={styles.errorMessage}>{error}</div>}
 
         {/* Projects Section */}
@@ -309,19 +324,21 @@ const BrowseProjects = () => {
                       </span>
                     </div>
 
+                    {/* 👇 CHANGED THIS SECTION TO LINKS 👇 */}
                     {user && user.role === 'expert' ? (
-                      <button style={styles.projectLink}>
+                      <Link to={`/projects/${project._id}`} style={styles.projectLink}>
                         Place Bid
-                      </button>
+                      </Link>
                     ) : user ? (
-                      <button style={styles.projectLink} disabled>
+                      <Link to={`/projects/${project._id}`} style={styles.projectLink}>
                         View Details
-                      </button>
+                      </Link>
                     ) : (
                       <Link to="/login" style={styles.projectLink}>
-                        Login to Bid
+                        Login to View
                       </Link>
                     )}
+                    {/* 👆 END LINK CHANGES 👆 */}
                   </div>
                 ))}
               </div>

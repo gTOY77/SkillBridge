@@ -11,6 +11,9 @@ import ProfileEdit from './pages/ProfileEdit';
 import BrowseProjects from './pages/BrowseProjects';
 import CreateProject from './pages/CreateProject';
 import AdminReports from './pages/AdminReports';
+import ProjectDetails from './pages/ProjectDetails';
+import PostProject from './pages/PostProject';
+import EditProject from './pages/EditProject';
 
 function App() {
   return (
@@ -27,6 +30,9 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/admin/reports" element={<AdminReports />} />
         <Route path="/report" element={<ReportForm />} />
+        <Route path="/projects/:id" element={<ProjectDetails />} />
+        <Route path="/create-project" element={<PostProject />} />
+        <Route path="/edit-project/:id" element={<EditProject />} />
         <Route path="*" element={<h2 style={{ padding: '2rem', textAlign: 'center' }}>404 - Page Not Found</h2>} />
       </Routes>
     </BrowserRouter>

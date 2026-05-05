@@ -360,9 +360,19 @@ const ClientDashboard = () => {
                     <button style={{ ...styles.button, flex: 1, fontSize: '0.9rem' }}>
                       👥 {project.bids?.length || 0} Bids
                     </button>
-                    <button style={{ ...styles.button, ...styles.secondaryButton, flex: 1, fontSize: '0.9rem' }}>
-                      Edit
-                    </button>
+                    <Link 
+                    to={`/edit-project/${project._id}`} 
+                    style={{ 
+                    ...styles.button, 
+                    ...styles.secondaryButton, 
+                    flex: 1, 
+                    fontSize: '0.9rem',
+                    textAlign: 'center',
+                    boxSizing: 'border-box'
+                }}
+              >
+                  Edit
+                  </Link>
                   </div>
                 </div>
               ))}
