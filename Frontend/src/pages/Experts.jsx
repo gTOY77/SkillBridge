@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios'; 
 import { userAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import ReviewForm from '../components/ReviewForm';
 
 const Experts = () => {
-  const { user } = useAuth();
+  const { user } = useAuth(); 
+  const [reviews, setReviews] = useState([]); 
   const [experts, setExperts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -12,10 +15,14 @@ const Experts = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  
   useEffect(() => {
-    fetchExperts(currentPage);
-  }, [currentPage]);
-
+    if (selectedExpert) {
+      axios.get(`http://localhost:5000/api/reviews/${selectedExpert._id}`)
+        .then(res => setReviews(res.data.reviews))
+        .catch(err => console.error("Error fetching reviews:", err));
+    }
+  }, [selectedExpert]);
   const fetchExperts = async (page = 1) => {
     try {
       setLoading(true);
@@ -478,6 +485,7 @@ const Experts = () => {
               <button style={styles.modalClose} onClick={() => setSelectedExpert(null)}>
                 ×
               </button>
+              
               <div style={styles.modalHeader}>
                 <div style={styles.modalAvatar}>
                   {selectedExpert.name.charAt(0).toUpperCase()}
@@ -493,10 +501,11 @@ const Experts = () => {
                   </div>
                 </div>
               </div>
+
               <div style={styles.modalBody}>
                 <div style={styles.modalSectionTitle}>About</div>
                 <p>{selectedExpert.bio || 'No profile bio available yet.'}</p>
-
+                
                 {selectedExpert.skills && selectedExpert.skills.length > 0 && (
                   <>
                     <div style={styles.modalSectionTitle}>Skills</div>
@@ -516,7 +525,46 @@ const Experts = () => {
                     <p>${selectedExpert.hourlyRate}/hour</p>
                   </>
                 )}
-              </div>
+
+                {/* --- REVIEWS DISPLAY SECTION --- */}
+                <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border-light)', paddingTop: '1.5rem' }}>
+                  <div style={styles.modalSectionTitle}>Client Reviews</div>
+                  
+                  {reviews.length === 0 ? (
+                    <p style={{ color: 'var(--text-gray)' }}>No reviews yet.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                      {reviews.map((rev) => (
+                        <div key={rev._id} style={{ padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                          <div style={{ fontWeight: 'bold' }}>
+                            {rev.client?.name || 'Client'} 
+                            <span style={{ color: '#fbbf24', marginLeft: '8px' }}>
+                              {'★'.repeat(rev.rating)}{'☆'.repeat(5 - rev.rating)}
+                            </span>
+                          </div>
+                          <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem' }}>"{rev.comment}"</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ONLY show the form if the logged-in user is a Client! */}
+                  {(user?.role === 'client' || user?.role === 'Client') && (
+                    <div style={{ marginTop: '1.5rem' }}>
+                      <ReviewForm 
+                        expertId={selectedExpert._id} 
+                        onReviewAdded={() => {
+                          fetchExperts(currentPage); 
+                          axios.get(`http://localhost:5000/api/reviews/${selectedExpert._id}`)
+                            .then(res => setReviews(res.data.reviews));
+                        }} 
+                      />
+                    </div>
+                  )}
+                </div>
+                {/* 👆 END OF REVIEWS SECTION 👆 */}
+
+              </div> {/* <-- This safely closes the modalBody */}
 
               <div style={styles.modalActions}>
                 <button style={{ ...styles.messageButton, ...styles.messageButtonDisabled }} disabled>
@@ -526,6 +574,7 @@ const Experts = () => {
                   Close
                 </button>
               </div>
+
             </div>
           </div>
         )}

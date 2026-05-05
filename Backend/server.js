@@ -37,7 +37,9 @@ app.get('/', (req, res) => {
 
 // 6. Mount API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/reviews', require('./routes/reviewRoutes'));
 app.use('/api/users', userRoutes);
+app.use('/api/reports', require('./routes/reportRoutes'));
 app.use('/api/projects', projectRoutes);
 app.use('/api/skills', skillRoutes);
 app.use('/api/admin', adminRoutes);

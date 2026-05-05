@@ -61,6 +61,17 @@ const Navbar = () => {
     backgroundColor: 'var(--danger-red)',
   };
 
+  // 👇 Added a special style just for the Report button!
+  const reportButtonStyle = {
+    padding: '0.5rem 1rem',
+    backgroundColor: '#fee2e2',
+    color: '#b91c1c',
+    borderRadius: '6px',
+    textDecoration: 'none',
+    fontWeight: 'bold',
+    transition: 'all 0.3s ease',
+  };
+
   const userMenuStyle = {
     display: 'flex',
     gap: '1rem',
@@ -122,8 +133,21 @@ const Navbar = () => {
           </>
         ) : (
           <>
+            {/* 👇 SMART REPORT BUTTON LOGIC ADDED HERE 👇 */}
             <li>
-              {/* 👇 Changed this to say Admin Panel if you are an admin */}
+              {user.role === 'admin' ? (
+                <Link to="/admin/reports" style={linkStyle} onMouseEnter={(e) => e.target.style.color = 'var(--primary-blue)'} onMouseLeave={(e) => e.target.style.color = 'var(--text-dark)'}>
+                  📑 View Reports
+                </Link>
+              ) : (
+                <Link to="/report" style={reportButtonStyle}>
+                  🚩 Report Issue
+                </Link>
+              )}
+            </li>
+            {/* 👆 END SMART REPORT BUTTON 👆 */}
+
+            <li>
               <Link to="/dashboard" style={linkStyle} onMouseEnter={(e) => e.target.style.color = 'var(--primary-blue)'} onMouseLeave={(e) => e.target.style.color = 'var(--text-dark)'}>
                 {user.role === 'admin' ? '👑 Admin Panel' : '📊 Dashboard'}
               </Link>
@@ -131,12 +155,9 @@ const Navbar = () => {
             <li style={userMenuStyle}>
               <div style={userInfoStyle}>
                 <div style={userNameStyle}>{user.name}</div>
-                
-                {/* 👇 Added the Admin role check here! */}
                 <div style={userRoleStyle}>
                   {user.role === 'admin' ? '👑 Admin' : user.role === 'expert' ? '💼 Expert' : '📚 Client'}
                 </div>
-
               </div>
               <button onClick={handleLogout} style={logoutButtonStyle} onMouseEnter={(e) => e.target.style.backgroundColor = '#c0392b'} onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--danger-red)'}>
                 Logout

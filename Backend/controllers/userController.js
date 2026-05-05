@@ -97,13 +97,20 @@ exports.getAllExperts = async (req, res) => {
 
 exports.searchExperts = async (req, res) => {
   try {
-    const { skills, minRating } = req.query;
+    // Note: your frontend sends the search term inside the "skills" variable
+    const { skills, minRating } = req.query; 
 
     let filter = { role: 'expert' };
 
     if (skills) {
-      const skillArray = skills.split(',').map((s) => s.trim());
-      filter.skills = { $in: skillArray };
+      // 1. Clean up the search text
+      const searchTerm = skills.trim();
+      
+      // 2. Tell MongoDB to look for this text in EITHER the name OR the skills
+      filter.$or = [
+        { name: { $regex: searchTerm, $options: 'i' } },   // 'i' makes it case-insensitive
+        { skills: { $regex: searchTerm, $options: 'i' } } 
+      ];
     }
 
     if (minRating) {
@@ -125,7 +132,6 @@ exports.searchExperts = async (req, res) => {
     });
   }
 };
-
 exports.addSkill = async (req, res) => {
   try {
     const { skillName } = req.body;

@@ -1,4 +1,5 @@
 import React from 'react';
+import ReportForm from './components/ReportForm';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
@@ -9,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import ProfileEdit from './pages/ProfileEdit';
 import BrowseProjects from './pages/BrowseProjects';
 import CreateProject from './pages/CreateProject';
+import AdminReports from './pages/AdminReports';
 
 function App() {
   return (
@@ -23,6 +25,8 @@ function App() {
         <Route path="/create-project" element={<CreateProject />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/admin/reports" element={<AdminReports />} />
+        <Route path="/report" element={<ReportForm />} />
         <Route path="*" element={<h2 style={{ padding: '2rem', textAlign: 'center' }}>404 - Page Not Found</h2>} />
       </Routes>
     </BrowserRouter>
