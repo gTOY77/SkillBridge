@@ -33,19 +33,18 @@ const conversationSchema = new mongoose.Schema(
 
 // Indexing for faster lookups
 conversationSchema.index({ participants: 1 });
-
-// Database-level validation: Prevent Expert-to-Expert conversations
-conversationSchema.pre('save', async function(next) {
+conversationSchema.pre('save', async function() {
   if (this.isNew) {
+    const mongoose = require('mongoose'); // Ensure mongoose is available
     const User = mongoose.model('User');
-    const participants = await User.find({ _id: { $in: this.participants } });
     
+    const participants = await User.find({ _id: { $in: this.participants } });
     const expertCount = participants.filter(p => p.role === 'expert').length;
+
     if (expertCount > 1) {
-      return next(new Error('Permission denied: Experts cannot have conversations with other experts.'));
+      throw new Error('Permission denied: Experts cannot have conversations with other experts.');
     }
   }
-  next();
 });
 
 module.exports = mongoose.model('Conversation', conversationSchema);

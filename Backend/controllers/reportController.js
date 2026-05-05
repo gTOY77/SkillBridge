@@ -31,3 +31,25 @@ exports.getReports = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
+
+// In backend/controllers/reportController.js
+exports.resolveReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Find the report by ID and change its status to 'Resolved'
+    const updatedReport = await Report.findByIdAndUpdate(
+      id, 
+      { status: 'Resolved' }, 
+      { new: true }
+    );
+
+    if (!updatedReport) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+
+    res.status(200).json({ message: 'Report resolved successfully', report: updatedReport });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error updating report' });
+  }
+};
