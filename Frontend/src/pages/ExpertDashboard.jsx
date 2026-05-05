@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { userAPI, projectAPI, bidAPI } from '../services/api';
+import { userAPI, projectAPI, bidAPI, paymentAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useMessages } from '../context/MessageContext';
 
@@ -14,6 +14,7 @@ const ExpertDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [newSkill, setNewSkill] = useState('');
+  const [transactions, setTransactions] = useState([]);
   
   const [availableSkills] = useState([
     'Web Development', 'Mobile App Development', 'UI/UX Design', 'Python',
@@ -50,6 +51,11 @@ const ExpertDashboard = () => {
       const bidsRes = await bidAPI.getExpertBids();
       const expertBids = bidsRes.data.data || [];
 
+      // Fetch Transaction History
+      const transRes = await paymentAPI.getHistory();
+      const transactionHistory = transRes.data.data || [];
+      setTransactions(transactionHistory);
+
       let currentProfile = user;
       const profileResponse = await userAPI.getProfile(userId);
       
@@ -69,13 +75,15 @@ const ExpertDashboard = () => {
       setSkills(currentProfile?.skills || []);
 
       // Calculate stats
+      const totalEarnings = transactionHistory
+        .filter(t => t.status === 'completed')
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
+
       setStats({
         totalSkills: currentProfile?.skills?.length || 0,
         bidsMade: expertBids.length,
         projectsWon: expertBids.filter(b => b.status === 'selected').length,
-        totalEarnings: expertBids
-          .filter(b => b.status === 'selected')
-          .reduce((sum, b) => sum + (b.bidAmount || 0), 0),
+        totalEarnings: totalEarnings,
       });
 
     } catch (err) {
@@ -108,12 +116,20 @@ const ExpertDashboard = () => {
           const awardAmount = notif.data?.budget ? parseFloat(notif.data.budget) : 0;
           setStats(prev => ({
             ...prev,
-            projectsWon: prev.projectsWon + 1,
-            totalEarnings: prev.totalEarnings + awardAmount
+            projectsWon: prev.projectsWon + 1
           }));
           
           // Also fetch projects to update the list without reload
           fetchData();
+        }
+
+        if (notif.type === 'payment_received') {
+          const amount = notif.data?.amount ? parseFloat(notif.data.amount) : 0;
+          setStats(prev => ({
+            ...prev,
+            totalEarnings: prev.totalEarnings + amount
+          }));
+          fetchData(); // Refresh history and profile
         }
       };
 
@@ -316,6 +332,62 @@ const ExpertDashboard = () => {
                   </button>
                 ))}
             </div>
+          </div>
+        </div>
+
+        {/* Transaction History Section */}
+        <div style={styles.section}>
+          <div style={styles.sectionTitle}>💰 Recent Earnings</div>
+          <div style={{
+            backgroundColor: '#fff', borderRadius: '12px', padding: '1.5rem', 
+            boxShadow: 'var(--shadow)', border: '1px solid var(--border-light)'
+          }}>
+            {transactions.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-gray)' }}>
+                No payment history yet. Complete projects to start earning!
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9', textAlign: 'left' }}>
+                      <th style={{ padding: '1rem', color: '#64748b', fontSize: '0.85rem' }}>DATE</th>
+                      <th style={{ padding: '1rem', color: '#64748b', fontSize: '0.85rem' }}>PROJECT</th>
+                      <th style={{ padding: '1rem', color: '#64748b', fontSize: '0.85rem' }}>CLIENT</th>
+                      <th style={{ padding: '1rem', color: '#64748b', fontSize: '0.85rem' }}>AMOUNT</th>
+                      <th style={{ padding: '1rem', color: '#64748b', fontSize: '0.85rem' }}>STATUS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.slice(0, 5).map((txn) => (
+                      <tr key={txn._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
+                          {new Date(txn.createdAt).toLocaleDateString()}
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: '600' }}>
+                          {txn.projectId?.title || 'Unknown Project'}
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
+                          {txn.clientId?.name || 'Unknown Client'}
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: '700', color: '#166534' }}>
+                          +${txn.amount}
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{
+                            padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700',
+                            backgroundColor: txn.status === 'completed' ? '#dcfce7' : '#fee2e2',
+                            color: txn.status === 'completed' ? '#166534' : '#b91c1c'
+                          }}>
+                            {txn.status.toUpperCase()}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
 

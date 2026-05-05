@@ -98,4 +98,11 @@ export const bidAPI = {
   getNotifications: () => api.get('/bids/notifications'),
 };
 
+// Payment endpoints
+export const paymentAPI = {
+  processPayment: (data) => api.post('/payments/process', data),
+  getHistory: () => api.get('/payments/history'),
+  getEarnings: () => api.get('/payments/earnings'),
+};
+
 export default api;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { projectAPI, bidAPI } from '../services/api';
+import { projectAPI, bidAPI, paymentAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useMessages } from '../context/MessageContext';
 
@@ -11,6 +11,16 @@ const ClientDashboard = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [transactions, setTransactions] = useState([]);
+  
+  // Payment Simulation State
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedProjectForPayment, setSelectedProjectForPayment] = useState(null);
+  const [paymentStep, setPaymentStep] = useState(1); // 1: Select Method, 2: Details, 3: Processing, 4: Success
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [cardDetails, setCardDetails] = useState({ cardNumber: '', expiry: '', cvc: '', email: '' });
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const [stats, setStats] = useState({
     totalProjects: 0,
     activeProjects: 0,
@@ -24,6 +34,7 @@ const ClientDashboard = () => {
     if (userId) {
       fetchProjects();
       fetchNotifications();
+      fetchTransactionHistory();
     }
   }, [userId]);
 
@@ -43,6 +54,9 @@ const ClientDashboard = () => {
           
           // Refresh projects list to update UI
           fetchProjects();
+        } else if (notif.type === 'payment_completed') {
+          // Refresh transaction history when payment is confirmed
+          fetchTransactionHistory();
         } else {
           fetchProjects(); // Generic refresh for other updates
         }
@@ -50,6 +64,15 @@ const ClientDashboard = () => {
       return () => socket.off('notification');
     }
   }, [socket]);
+
+  const fetchTransactionHistory = async () => {
+    try {
+      const response = await paymentAPI.getHistory();
+      setTransactions(response.data.data || []);
+    } catch (err) {
+      console.error('Error fetching transactions:', err);
+    }
+  };
 
   const fetchNotifications = async () => {
     try {
@@ -320,6 +343,45 @@ const ClientDashboard = () => {
     }
   };
 
+  const handleProcessPayment = async () => {
+    try {
+      setIsProcessing(true);
+      setPaymentStep(3);
+      
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const response = await paymentAPI.processPayment({
+        projectId: selectedProjectForPayment._id,
+        paymentMethod,
+        cardDetails
+      });
+
+      if (response.data.success) {
+        setPaymentStep(4);
+        // Notify expert via socket
+        if (socket) {
+          socket.emit('projectCompleted', { // Reusing projectCompleted or specialized payment event
+            recipientId: selectedProjectForPayment.assignedTo?._id || selectedProjectForPayment.assignedTo,
+            notification: {
+              type: 'payment_received',
+              title: 'Payment Confirmed',
+              content: `You received $${selectedProjectForPayment.budget} for "${selectedProjectForPayment.title}"`,
+              link: '/dashboard',
+              data: { amount: selectedProjectForPayment.budget }
+            }
+          });
+        }
+        fetchProjects(); // Refresh stats
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Payment simulation failed');
+      setPaymentStep(2);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const getStatusStyle = (status) => {
     switch (status) {
       case 'open':
@@ -395,6 +457,62 @@ const ClientDashboard = () => {
           </div>
         </div>
 
+        {/* Payment History Section */}
+        <div style={styles.section}>
+          <div style={styles.sectionTitle}>💰 Payment History</div>
+          <div style={{
+            backgroundColor: '#fff', borderRadius: '12px', padding: '1.5rem', 
+            boxShadow: 'var(--shadow)', border: '1px solid var(--border-light)'
+          }}>
+            {transactions.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-gray)' }}>
+                No payments made yet. Compensate your experts once projects are completed.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9', textAlign: 'left' }}>
+                      <th style={{ padding: '1rem', color: '#64748b', fontSize: '0.85rem' }}>DATE</th>
+                      <th style={{ padding: '1rem', color: '#64748b', fontSize: '0.85rem' }}>PROJECT</th>
+                      <th style={{ padding: '1rem', color: '#64748b', fontSize: '0.85rem' }}>EXPERT</th>
+                      <th style={{ padding: '1rem', color: '#64748b', fontSize: '0.85rem' }}>AMOUNT</th>
+                      <th style={{ padding: '1rem', color: '#64748b', fontSize: '0.85rem' }}>STATUS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.slice(0, 5).map((txn) => (
+                      <tr key={txn._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
+                          {new Date(txn.createdAt).toLocaleDateString()}
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: '600' }}>
+                          {txn.projectId?.title || 'Unknown Project'}
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
+                          {txn.expertId?.name || 'Unknown Expert'}
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: '700', color: '#b91c1c' }}>
+                          -${txn.amount}
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{
+                            padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700',
+                            backgroundColor: txn.status === 'completed' ? '#dcfce7' : '#fee2e2',
+                            color: txn.status === 'completed' ? '#166534' : '#b91c1c'
+                          }}>
+                            {txn.status.toUpperCase()}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Projects Section */}
         <div style={styles.section}>
           <div style={styles.sectionTitle}>
@@ -440,12 +558,168 @@ const ClientDashboard = () => {
                     >
                       👥 {project.bidCount || 0} Bids / View Details
                     </Link>
+                    {project.status === 'completed' && (
+                      <button
+                        onClick={() => {
+                          setSelectedProjectForPayment(project);
+                          setPaymentStep(1);
+                          setShowPaymentModal(true);
+                        }}
+                        style={{ ...styles.button, backgroundColor: '#16a34a', flex: 1, fontSize: '0.9rem' }}
+                      >
+                        💳 Pay Expert
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        {/* Payment Simulation Modal */}
+        {showPaymentModal && (
+          <div style={{
+            position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', 
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+            backdropFilter: 'blur(4px)'
+          }}>
+            <div style={{
+              backgroundColor: '#fff', padding: '2.5rem', borderRadius: '16px', 
+              width: '90%', maxWidth: '500px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
+            }}>
+              {paymentStep === 1 && (
+                <div>
+                  <h2 style={{ marginBottom: '0.5rem' }}>Secure Payment</h2>
+                  <p style={{ color: '#64748b', marginBottom: '2rem' }}>
+                    Select a payment method to compensate <strong>{selectedProjectForPayment?.assignedTo?.name || 'the expert'}</strong> for "<strong>{selectedProjectForPayment?.title}</strong>".
+                  </p>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {['Credit Card', 'PayPal', 'Bank Transfer', 'Digital Wallet'].map(method => (
+                      <button
+                        key={method}
+                        onClick={() => {
+                          setPaymentMethod(method);
+                          setPaymentStep(2);
+                        }}
+                        style={{
+                          padding: '1.2rem', borderRadius: '12px', border: '2px solid #e2e8f0',
+                          backgroundColor: '#fff', textAlign: 'left', cursor: 'pointer',
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary-blue)'}
+                        onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                      >
+                        <span style={{ fontWeight: '600' }}>{method}</span>
+                        <span>→</span>
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <button 
+                    onClick={() => setShowPaymentModal(false)}
+                    style={{ ...styles.button, ...styles.secondaryButton, width: '100%', marginTop: '1.5rem' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              {paymentStep === 2 && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <button onClick={() => setPaymentStep(1)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>←</button>
+                    <h2 style={{ margin: 0 }}>{paymentMethod} Details</h2>
+                  </div>
+                  
+                  <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <span>Amount to Pay:</span>
+                      <span style={{ fontWeight: '700', color: '#166534' }}>${selectedProjectForPayment?.budget}</span>
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Includes simulated processing fees ($0.00)</div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <input 
+                      type="text" placeholder="Card Number (Simulated)" 
+                      style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                      value={cardDetails.cardNumber}
+                      onChange={e => setCardDetails({...cardDetails, cardNumber: e.target.value})}
+                    />
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      <input 
+                        type="text" placeholder="MM/YY" 
+                        style={{ flex: 1, padding: '0.8rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                      />
+                      <input 
+                        type="text" placeholder="CVC" 
+                        style={{ flex: 1, padding: '0.8rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                      />
+                    </div>
+                    <input 
+                      type="email" placeholder="Billing Email" 
+                      style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                      value={cardDetails.email}
+                      onChange={e => setCardDetails({...cardDetails, email: e.target.value})}
+                    />
+                  </div>
+
+                  <button 
+                    onClick={handleProcessPayment}
+                    style={{ ...styles.button, width: '100%', marginTop: '2rem', height: '50px' }}
+                  >
+                    Confirm & Pay ${selectedProjectForPayment?.budget}
+                  </button>
+                </div>
+              )}
+
+              {paymentStep === 3 && (
+                <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+                  <div style={{ 
+                    width: '60px', height: '60px', border: '4px solid #f3f3f3', 
+                    borderTop: '4px solid var(--primary-blue)', borderRadius: '50%',
+                    animation: 'spin 1s linear infinite', margin: '0 auto 2rem'
+                  }} />
+                  <h2>Processing Payment...</h2>
+                  <p style={{ color: '#64748b' }}>Verifying simulated transaction with the university gateway.</p>
+                  <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+                </div>
+              )}
+
+              {paymentStep === 4 && (
+                <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+                  <div style={{ 
+                    fontSize: '4rem', color: '#166534', marginBottom: '1.5rem',
+                    backgroundColor: '#dcfce7', width: '100px', height: '100px',
+                    borderRadius: '50%', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', margin: '0 auto 1.5rem'
+                  }}>✓</div>
+                  <h2 style={{ color: '#166534' }}>Payment Successful!</h2>
+                  <p style={{ color: '#64748b', marginBottom: '2rem' }}>
+                    The expert has been notified and their earnings have been updated.
+                  </p>
+                  <div style={{ 
+                    textAlign: 'left', backgroundColor: '#f8fafc', padding: '1rem', 
+                    borderRadius: '8px', marginBottom: '2rem', fontSize: '0.9rem' 
+                  }}>
+                    <div><strong>Transaction ID:</strong> SIM-{Math.random().toString(36).substr(2, 9).toUpperCase()}</div>
+                    <div><strong>Date:</strong> {new Date().toLocaleDateString()}</div>
+                    <div><strong>Method:</strong> {paymentMethod}</div>
+                  </div>
+                  <button 
+                    onClick={() => setShowPaymentModal(false)}
+                    style={{ ...styles.button, width: '100%' }}
+                  >
+                    Back to Dashboard
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

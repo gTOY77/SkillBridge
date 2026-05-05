@@ -45,6 +45,7 @@ app.use('/api/skills', skillRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/messages', require('./routes/messageRoutes'));
 app.use('/api/bids', require('./routes/bidRoutes'));
+app.use('/api/payments', require('./routes/paymentRoutes'));
 
 // 7. 404 Handler
 app.use((req, res) => {
