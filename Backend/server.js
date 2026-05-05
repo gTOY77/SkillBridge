@@ -43,6 +43,7 @@ app.use('/api/reports', require('./routes/reportRoutes'));
 app.use('/api/projects', projectRoutes);
 app.use('/api/skills', skillRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/messages', require('./routes/messageRoutes'));
 
 // 7. 404 Handler
 app.use((req, res) => {
@@ -64,6 +65,14 @@ app.use((err, req, res, next) => {
 
 // 9. Start the Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+const http = require('http');
+const server = http.createServer(app);
+const setupSocket = require('./socket');
+const io = setupSocket(server);
+
+// Make io accessible in requests if needed
+app.set('io', io);
+
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

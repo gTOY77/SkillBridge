@@ -79,4 +79,13 @@ export const skillAPI = {
   deleteSkill: (id) => api.delete(`/skills/${id}`),
 };
 
+// Message endpoints
+export const messageAPI = {
+  sendMessage: (data) => api.post('/messages', data),
+  getConversations: () => api.get('/messages/conversations'),
+  getMessages: (conversationId, page = 1) => api.get(`/messages/${conversationId}?page=${page}`),
+  archiveConversation: (conversationId, archive) => api.put(`/messages/conversation/${conversationId}/archive`, { archive }),
+  deleteConversation: (conversationId) => api.delete(`/messages/conversation/${conversationId}`),
+};
+
 export default api;

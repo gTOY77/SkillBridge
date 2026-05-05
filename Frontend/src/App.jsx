@@ -14,8 +14,12 @@ import AdminReports from './pages/AdminReports';
 import ProjectDetails from './pages/ProjectDetails';
 import PostProject from './pages/PostProject';
 import EditProject from './pages/EditProject';
+import ChatPopup from './components/ChatPopup';
+import MessageNotificationBar from './components/MessageNotificationBar';
+import { useAuth } from './context/AuthContext';
 
 function App() {
+  const { user } = useAuth();
   return (
     <BrowserRouter>
       <Navbar />
@@ -35,6 +39,12 @@ function App() {
         <Route path="/edit-project/:id" element={<EditProject />} />
         <Route path="*" element={<h2 style={{ padding: '2rem', textAlign: 'center' }}>404 - Page Not Found</h2>} />
       </Routes>
+      {user && (
+        <>
+          <ChatPopup />
+          <MessageNotificationBar />
+        </>
+      )}
     </BrowserRouter>
   );
 }

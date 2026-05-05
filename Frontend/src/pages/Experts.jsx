@@ -3,9 +3,11 @@ import axios from 'axios';
 import { userAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import ReviewForm from '../components/ReviewForm';
+import { useMessages } from '../context/MessageContext';
 
 const Experts = () => {
   const { user } = useAuth(); 
+  const { openChat } = useMessages();
   const [reviews, setReviews] = useState([]); 
   const [experts, setExperts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -581,8 +583,11 @@ const Experts = () => {
               </div> {/* <-- This safely closes the modalBody */}
 
               <div style={styles.modalActions}>
-                <button style={{ ...styles.messageButton, ...styles.messageButtonDisabled }} disabled>
-                  ✉️ Message (Coming Soon)
+                <button 
+                  style={styles.messageButton} 
+                  onClick={() => openChat(selectedExpert)}
+                >
+                  ✉️ Message
                 </button>
                 <button style={styles.closeButton} onClick={() => setSelectedExpert(null)}>
                   Close
