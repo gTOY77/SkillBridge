@@ -67,17 +67,10 @@ const Login = () => {
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
 
-        const userRole = res.data.user.role;
-
-        // Route them to the correct dashboard based on their role!
+        // Route them to the central /dashboard route
+        // The Dashboard component will then handle role-based rendering
         setTimeout(() => {
-          if (userRole === 'Admin' || userRole === 'admin') {
-            window.location.href = '/admin-dashboard';
-          } else if (userRole === 'Expert' || userRole === 'expert') {
-            window.location.href = '/expert-dashboard';
-          } else {
-            window.location.href = '/client-dashboard';
-          }
+          window.location.href = '/dashboard';
         }, 1500);
       }
     } catch (err) {
