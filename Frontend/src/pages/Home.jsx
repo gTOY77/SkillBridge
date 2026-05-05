@@ -276,17 +276,8 @@ const Home = () => {
         </p>
         {!user && (
           <div style={styles.searchContainer}>
-            <input
-              type="text"
-              placeholder="What do you need help with?"
-              style={styles.searchInput}
-              disabled
-            />
-            <button style={styles.searchButton} disabled>
-              Search
-            </button>
-            <p style={{ width: '100%', marginTop: '0.5rem', fontSize: '0.9rem', opacity: 0.8 }}>
-              👉 <Link to="/register" style={{ color: '#fff', fontWeight: '600' }}>Sign up</Link> to explore projects
+            <p style={{ width: '100%', marginTop: '0.5rem', fontSize: '1.1rem', fontWeight: '500' }}>
+              🚀 <Link to="/register" style={{ color: '#fff', textDecoration: 'underline', fontWeight: '700' }}>Sign up</Link> now to explore projects and start earning!
             </p>
           </div>
         )}

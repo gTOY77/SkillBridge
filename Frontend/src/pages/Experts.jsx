@@ -16,13 +16,6 @@ const Experts = () => {
   const [totalPages, setTotalPages] = useState(1);
 
   
-  useEffect(() => {
-    if (selectedExpert) {
-      axios.get(`http://localhost:5000/api/reviews/${selectedExpert._id}`)
-        .then(res => setReviews(res.data.reviews))
-        .catch(err => console.error("Error fetching reviews:", err));
-    }
-  }, [selectedExpert]);
   const fetchExperts = async (page = 1) => {
     try {
       setLoading(true);
@@ -38,10 +31,25 @@ const Experts = () => {
     }
   };
 
+  useEffect(() => {
+    fetchExperts(currentPage);
+  }, [currentPage]);
+
+  useEffect(() => {
+    if (selectedExpert) {
+      axios.get(`http://localhost:5000/api/reviews/${selectedExpert._id}`)
+        .then(res => setReviews(res.data.reviews))
+        .catch(err => console.error("Error fetching reviews:", err));
+    }
+  }, [selectedExpert]);
+
   const handleSearch = async () => {
     if (!searchSkills.trim()) {
-      setCurrentPage(1);
-      fetchExperts(1);
+      if (currentPage === 1) {
+        fetchExperts(1);
+      } else {
+        setCurrentPage(1);
+      }
       return;
     }
 
@@ -368,7 +376,13 @@ const Experts = () => {
           <button style={styles.searchButton} onClick={handleSearch}>
             Search
           </button>
-          <button style={{ ...styles.searchButton, backgroundColor: '#6b7280' }} onClick={() => { setCurrentPage(1); fetchExperts(1); }}>
+          <button style={{ ...styles.searchButton, backgroundColor: '#6b7280' }} onClick={() => { 
+            if (currentPage === 1) {
+              fetchExperts(1);
+            } else {
+              setCurrentPage(1);
+            }
+          }}>
             Refresh
           </button>
         </div>
