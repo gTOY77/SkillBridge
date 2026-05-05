@@ -97,24 +97,27 @@ exports.getAllExperts = async (req, res) => {
 
 exports.searchExperts = async (req, res) => {
   try {
-    // Note: your frontend sends the search term inside the "skills" variable
     const { skills, minRating } = req.query; 
 
     let filter = { role: 'expert' };
 
-    if (skills) {
-      // 1. Clean up the search text
+    if (skills && typeof skills === 'string' && skills.trim() !== '') {
       const searchTerm = skills.trim();
       
-      // 2. Tell MongoDB to look for this text in EITHER the name OR the skills
+      // Escape special characters in searchTerm for regex
+      const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
       filter.$or = [
-        { name: { $regex: searchTerm, $options: 'i' } },   // 'i' makes it case-insensitive
-        { skills: { $regex: searchTerm, $options: 'i' } } 
+        { name: { $regex: escapedSearchTerm, $options: 'i' } },
+        { skills: { $elemMatch: { $regex: escapedSearchTerm, $options: 'i' } } }
       ];
     }
 
     if (minRating) {
-      filter.rating = { $gte: parseFloat(minRating) };
+      const rating = parseFloat(minRating);
+      if (!isNaN(rating)) {
+        filter.rating = { $gte: rating };
+      }
     }
 
     const experts = await User.find(filter).select('-password');

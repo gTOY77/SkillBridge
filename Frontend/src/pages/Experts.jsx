@@ -59,11 +59,18 @@ const Experts = () => {
       setLoading(true);
       setError('');
       const response = await userAPI.searchExperts(searchSkills);
-      setExperts(response.data.experts || []);
-      setCurrentPage(1);
-      setTotalPages(1); // For search, we don't have pagination yet
+      
+      if (response.data.success) {
+        setExperts(response.data.experts || []);
+        setCurrentPage(1);
+        setTotalPages(1);
+      } else {
+        setError(response.data.message || 'Failed to search experts');
+      }
     } catch (err) {
-      setError('Failed to search experts');
+      const errorMsg = err.response?.data?.message || 'Failed to search experts. Please try again.';
+      setError(errorMsg);
+      console.error('Search error:', err);
     } finally {
       setLoading(false);
     }
