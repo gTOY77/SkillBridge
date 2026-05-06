@@ -140,7 +140,22 @@ const ExpertDashboard = () => {
 
   const handleAddSkill = async () => {
     if (!newSkill.trim()) return;
-    // ... rest of handleAddSkill logic ...
+    
+    try {
+      const userId = user?._id || user?.id;
+      const response = await userAPI.addSkill(userId, { skillName: newSkill.trim() });
+      
+      if (response.data.success) {
+        setSkills(response.data.skills || []);
+        setNewSkill('');
+        setStats(prev => ({ 
+          ...prev, 
+          totalSkills: (response.data.skills || []).length 
+        }));
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to add skill');
+    }
   };
 
   const handleCompleteProject = async () => {
@@ -184,9 +199,15 @@ const ExpertDashboard = () => {
   const handleRemoveSkill = async (skillName) => {
     try {
       const userId = user?._id || user?.id;
-      const updatedUser = await userAPI.removeSkill(userId, skillName);
-      setSkills(updatedUser.data.skills || []);
-      setStats(prev => ({ ...prev, totalSkills: Math.max(0, prev.totalSkills - 1) }));
+      const response = await userAPI.removeSkill(userId, skillName);
+      if (response.data.success) {
+        const updatedSkills = response.data.skills || [];
+        setSkills(updatedSkills);
+        setStats(prev => ({ 
+          ...prev, 
+          totalSkills: updatedSkills.length 
+        }));
+      }
     } catch (err) {
       setError('Failed to remove skill');
     }
